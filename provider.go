@@ -1,26 +1,116 @@
-// Package libdnstemplate implements a DNS record management client compatible
-// with the libdns interfaces for <PROVIDER NAME>. TODO: This package is a
-// template only. Customize all godocs for actual implementation.
-package libdnstemplate
+// Package nfsn implements a DNS record management client compatible with the libdns interfaces for
+// nearlyfreespeech.net (NFSN)
+package nfsn
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/sha1"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
 
 	"github.com/libdns/libdns"
 )
 
-// TODO: Providers must not require additional provisioning steps by the callers; it
-// should work simply by populating a struct and calling methods on it. If your DNS
-// service requires long-lived state or some extra provisioning step, do it implicitly
-// when methods are called; sync.Once can help with this, and/or you can use a
-// sync.(RW)Mutex in your Provider struct to synchronize implicit provisioning.
+// TODO: Providers must not require additional provisioning steps by the callers; it should work
+// simply by populating a struct and calling methods on it. If your DNS service requires long-lived
+// state or some extra provisioning step, do it implicitly when methods are called; sync.Once can
+// help with this, and/or you can use a sync.(RW)Mutex in your Provider struct to synchronize
+// implicit provisioning.
 
-// Provider facilitates DNS record manipulation with <TODO: PROVIDER NAME>.
+// API format:
+//
+// GET/PUT/POST https://api.nearlyfreespeech.net/[NOUN]/[IDENTIFIER]/[VERB]
+
+// Constants used for API salt generation
+const saltChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijjklmnopqrstuvwxyz0123456789"
+const saltLen = 16
+
+// Provider facilitates DNS record manipulation with nearlyfreespeech.net
 type Provider struct {
-	// TODO: put config fields here (with snake_case json
-	// struct tags on exported fields), for example:
-	APIToken string `json:"api_token,omitempty"`
+	// NFSN Member Login.
+	Login string `json:"login,omitempty"`
+
+	// NFSN API Key. API Keys can be generated from the "Profile" tab in the NFSN member interface.
+	APIKey string `json:"api_key,omitempty"`
+}
+
+// Constructs a value to pass in an X-NFSN-Authentication header.
+//
+// The header value has the format [LOGIN];[TIMESTAMP];[SALT];[HASH]
+//
+// * LOGIN is the member's login name
+// * TIMESTAMP is a 32 bit unsigned unix timestamp
+// * SALT is a random, 16 character, alphanumeric string
+// * HASH is sha1("[LOGIN];[TIMESTAMP];[SALT];[API_KEY];[REQUEST_URI];[BODY_HASH]")
+//   * LOGIN, TIMESTAMP, SALT are the same as above
+//   * API_KEY is the member's private API key
+//   * REQUEST_URI is the PATH portion of the request URI
+//   * BODY_HASH is the SHA1 hash of the request body (or of the empty string, if no request body is
+//     present)
+//
+// Takes `timestamp` and `salt` values for testing.
+func (p *Provider) innerGetAuthValue(req *http.Request, timestamp time.Time, salt string) (string, error) {
+	var bodyBytes []byte
+	var err error
+
+	if req.Body != nil {
+		bodyBytes, err = io.ReadAll(req.Body)
+
+		if err != nil {
+			return "", err
+		}
+	}
+
+	// Restore the body so it can be read again later
+	req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	bodyHash := sha1.Sum(bodyBytes)
+
+	// Build the text to hash
+	hText := fmt.Sprintf("%s;%d;%s;%s;%s;%x", p.Login, timestamp.Unix(), salt, p.APIKey, req.URL.Path, bodyHash)
+	hHash := sha1.Sum([]byte(hText))
+
+	// Format the auth value to send on the wire
+	authVal := fmt.Sprintf("%s;%d;%s;%x", p.Login, timestamp.Unix(), salt, hHash)
+	return authVal, nil
+}
+
+// Generate a random salt usable for generating an X-NFSN-Authentication header value. See
+// `innerGetAuthValue` for details.
+func genSalt() (string, error) {
+	bytes := make([]byte, saltLen)
+	readLen, err := rand.Read(bytes)
+
+	if err != nil {
+		return "", err
+	}
+
+	if readLen != saltLen {
+		return "", fmt.Errorf("Failed to read enough random bytes")
+	}
+
+	var sb strings.Builder
+
+	for b := range bytes {
+		sb.WriteByte(saltChars[b % len(saltChars)])
+	}
+
+	return sb.String(), nil
+}
+
+// See `innerGetAuthValue` for details.
+func (p *Provider) getAuthValue(req *http.Request) (string, error) {
+	salt, err := genSalt()
+
+	if err != nil {
+		return "", err
+	}
+
+	return p.innerGetAuthValue(req, time.Now(), salt)
 }
 
 // GetRecords lists all the records in the zone.

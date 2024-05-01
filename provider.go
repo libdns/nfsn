@@ -179,10 +179,11 @@ func (p *Provider) ensureClient() {
 	}
 }
 
-// GetRecords lists all the records in the zone.
-func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record, error) {
+// Makes a request with the given parameters (see `http.NewRequestWithContext`), adding necessary
+// auth information before executing it.
+func (p *Provider) makeRequest(ctx context.Context, method string, url string, body io.Reader) (*http.Response, error) {
 	p.ensureClient()
-	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/dns/%s/listRRs", apiBase, zone), nil)
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
 
 	if err != nil {
 		return nil, err
@@ -195,7 +196,12 @@ func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record
 	}
 
 	req.Header.Add(authHeader, authValue)
-	resp, err := p.client.Do(req)
+	return p.client.Do(req)
+}
+
+// GetRecords lists all the records in the zone.
+func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record, error) {
+	resp, err := p.makeRequest(ctx, "POST", fmt.Sprintf("%s/dns/%s/listRRs", apiBase, zone), nil)
 
 	if err != nil {
 		return nil, err
@@ -232,7 +238,6 @@ func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record
 // AppendRecords adds records to the zone. It returns the records that were added.
 func (p *Provider) AppendRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
 	// https://members.nearlyfreespeech.net/wiki/API/DNSAddRR
-	p.ensureClient()
 	return nil, fmt.Errorf("TODO: not implemented")
 }
 
@@ -240,14 +245,12 @@ func (p *Provider) AppendRecords(ctx context.Context, zone string, records []lib
 // It returns the updated records.
 func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
 	// https://members.nearlyfreespeech.net/wiki/API/DNSReplaceRR
-	p.ensureClient()
 	return nil, fmt.Errorf("TODO: not implemented")
 }
 
 // DeleteRecords deletes the records from the zone. It returns the records that were deleted.
 func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
 	// https://members.nearlyfreespeech.net/wiki/API/DNSRemoveRR
-	p.ensureClient()
 	return nil, fmt.Errorf("TODO: not implemented")
 }
 

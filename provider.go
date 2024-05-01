@@ -54,7 +54,44 @@ type nfsnRecord struct {
 	Data  string `json:"data,omitempty"`
 	TTL   int    `json:"ttl,omitempty"`
 	Scope string `json:"scope,omitempty"`
-	Aux   int `json:"aux,omitempty"`
+	Aux   int    `json:"aux,omitempty"`
+}
+
+func (r nfsnRecord) Record() (libdns.Record, error) {
+	lr := libdns.Record{
+		Type:  r.Type,
+		Name:  r.Name,
+		Value: r.Data,
+		TTL:   time.Second * time.Duration(r.TTL),
+	}
+
+	switch r.Type {
+	case "HTTPS":
+	case "MX":
+		lr.Priority = uint(r.Aux)
+	case "SRV":
+	case "URI":
+		// Priority is in the 'aux' field from NFSN
+		lr.Priority = uint(r.Aux)
+
+		// Data is "weight port target", libdns expects weight in the record
+		parts := strings.SplitN(r.Data, " ", 2)
+
+		if len(parts) != 3 {
+			return libdns.Record{}, fmt.Errorf("%s record %s has incorrect format", r.Name, r.Data)
+		}
+
+		weight, err := strconv.Atoi(parts[0])
+
+		if err != nil {
+			return libdns.Record{}, err
+		}
+
+		lr.Weight = uint(weight)
+		lr.Value = parts[1]
+	}
+
+	return lr, nil
 }
 
 // Constructs a value to pass into an X-NFSN-Authentication header.
@@ -182,37 +219,10 @@ func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record
 	rs := make([]libdns.Record, 0, len(nrs))
 
 	for _, nr := range nrs {
-		r := libdns.Record{
-			Type:  nr.Type,
-			Name:  nr.Name,
-			Value: nr.Data,
-			TTL:   time.Second * time.Duration(nr.TTL),
-		}
+		r, err := nr.Record()
 
-		switch nr.Type{
-		case "HTTPS":
-		case "MX":
-			r.Priority = uint(nr.Aux)
-		case "SRV":
-		case "URI":
-			// Priority is in the 'aux' field from NFSN
-			r.Priority = uint(nr.Aux)
-
-			// Data is "weight port target", libdns expects weight in the record
-			parts := strings.SplitN(nr.Data, " ", 2)
-
-			if len(parts) != 3 {
-				return nil, fmt.Errorf("%s record %s has incorrect format", nr.Name, nr.Data)
-			}
-
-			weight, err := strconv.Atoi(parts[0])
-
-			if err != nil {
-				return nil, err
-			}
-
-			r.Weight = uint(weight)
-			r.Value = parts[1]
+		if err != nil {
+			return nil, err
 		}
 
 		rs = append(rs, r)

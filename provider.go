@@ -57,28 +57,28 @@ type nfsnRecord struct {
 	Aux   int    `json:"aux,omitempty"`
 }
 
-func (r nfsnRecord) Record() (libdns.Record, error) {
-	lr := libdns.Record{
-		Type:  r.Type,
-		Name:  r.Name,
-		Value: r.Data,
-		TTL:   time.Second * time.Duration(r.TTL),
+func (nRecord nfsnRecord) Record() (libdns.Record, error) {
+	record := libdns.Record{
+		Type:  nRecord.Type,
+		Name:  nRecord.Name,
+		Value: nRecord.Data,
+		TTL:   time.Second * time.Duration(nRecord.TTL),
 	}
 
-	switch r.Type {
+	switch nRecord.Type {
 	case "HTTPS":
 	case "MX":
-		lr.Priority = uint(r.Aux)
+		record.Priority = uint(nRecord.Aux)
 	case "SRV":
 	case "URI":
 		// Priority is in the 'aux' field from NFSN
-		lr.Priority = uint(r.Aux)
+		record.Priority = uint(nRecord.Aux)
 
 		// Data is "weight port target", libdns expects weight in the record
-		parts := strings.SplitN(r.Data, " ", 2)
+		parts := strings.SplitN(nRecord.Data, " ", 2)
 
 		if len(parts) != 3 {
-			return libdns.Record{}, fmt.Errorf("%s record %s has incorrect format", r.Name, r.Data)
+			return libdns.Record{}, fmt.Errorf("%s record %s has incorrect format", nRecord.Name, nRecord.Data)
 		}
 
 		weight, err := strconv.Atoi(parts[0])
@@ -87,11 +87,11 @@ func (r nfsnRecord) Record() (libdns.Record, error) {
 			return libdns.Record{}, err
 		}
 
-		lr.Weight = uint(weight)
-		lr.Value = parts[1]
+		record.Weight = uint(weight)
+		record.Value = parts[1]
 	}
 
-	return lr, nil
+	return record, nil
 }
 
 // Constructs a value to pass into an X-NFSN-Authentication header.
@@ -181,8 +181,6 @@ func (p *Provider) ensureClient() {
 
 // GetRecords lists all the records in the zone.
 func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record, error) {
-	// https://members.nearlyfreespeech.net/wiki/API/DNSListRRs
-	// URI: /dns/[ZONE]/listRRs
 	p.ensureClient()
 	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/dns/%s/listRRs", apiBase, zone), nil)
 
@@ -209,31 +207,32 @@ func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record
 		return nil, err
 	}
 
-	var nrs []nfsnRecord
-	err = json.Unmarshal(bodyBytes, &nrs)
+	var nRecords []nfsnRecord
+	err = json.Unmarshal(bodyBytes, &nRecords)
 
 	if err != nil {
 		return nil, err
 	}
 
-	rs := make([]libdns.Record, 0, len(nrs))
+	records := make([]libdns.Record, 0, len(nRecords))
 
-	for _, nr := range nrs {
-		r, err := nr.Record()
+	for _, nRecord := range nRecords {
+		record, err := nRecord.Record()
 
 		if err != nil {
 			return nil, err
 		}
 
-		rs = append(rs, r)
+		records = append(records, record)
 	}
 
-	return rs, nil
+	return records, nil
 }
 
 // AppendRecords adds records to the zone. It returns the records that were added.
 func (p *Provider) AppendRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
 	// https://members.nearlyfreespeech.net/wiki/API/DNSAddRR
+	p.ensureClient()
 	return nil, fmt.Errorf("TODO: not implemented")
 }
 
@@ -241,12 +240,14 @@ func (p *Provider) AppendRecords(ctx context.Context, zone string, records []lib
 // It returns the updated records.
 func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
 	// https://members.nearlyfreespeech.net/wiki/API/DNSReplaceRR
+	p.ensureClient()
 	return nil, fmt.Errorf("TODO: not implemented")
 }
 
 // DeleteRecords deletes the records from the zone. It returns the records that were deleted.
 func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
 	// https://members.nearlyfreespeech.net/wiki/API/DNSRemoveRR
+	p.ensureClient()
 	return nil, fmt.Errorf("TODO: not implemented")
 }
 

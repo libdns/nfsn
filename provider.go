@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,16 +19,6 @@ import (
 
 	"github.com/libdns/libdns"
 )
-
-// TODO: Providers must not require additional provisioning steps by the callers; it should work
-// simply by populating a struct and calling methods on it. If your DNS service requires long-lived
-// state or some extra provisioning step, do it implicitly when methods are called; sync.Once can
-// help with this, and/or you can use a sync.(RW)Mutex in your Provider struct to synchronize
-// implicit provisioning.
-
-// API format:
-//
-// GET/PUT/POST https://api.nearlyfreespeech.net/[NOUN]/[IDENTIFIER]/[VERB]
 
 const apiBase = "https://api.nearlyfreespeech.net"
 const authHeader = "X-NFSN-Authentication"
@@ -55,6 +46,15 @@ type nfsnRecord struct {
 	TTL   int    `json:"ttl,omitempty"`
 	Scope string `json:"scope,omitempty"`
 	Aux   int    `json:"aux,omitempty"`
+}
+
+// The pieces necessary to make a request to create/update a record in NFSN. Differs slightly from
+// the fields in libdns.Record
+type nfsnRecordParameters struct {
+	Name string
+	Type string
+	Data string
+	TTL  int
 }
 
 func (nRecord nfsnRecord) Record() (libdns.Record, error) {
@@ -92,6 +92,29 @@ func (nRecord nfsnRecord) Record() (libdns.Record, error) {
 	}
 
 	return record, nil
+}
+
+func toNfsnRecordParameters(record libdns.Record) url.Values {
+	var dataBuilder strings.Builder
+
+	switch record.Type {
+	case "HTTPS":
+	case "MX":
+		dataBuilder.WriteString(fmt.Sprintf("%d ", record.Priority))
+	case "SRV":
+	case "URI":
+		dataBuilder.WriteString(fmt.Sprintf("%d %d ", record.Priority, record.Weight))
+	}
+
+	dataBuilder.WriteString(record.Value)
+
+	parameters :=  url.Values{}
+	parameters.Set("name", record.Name)
+	parameters.Set("type", record.Type)
+	parameters.Set("data", dataBuilder.String())
+	parameters.Set("ttl", fmt.Sprintf("%d", record.TTL))
+
+	return parameters
 }
 
 // Constructs a value to pass into an X-NFSN-Authentication header.
@@ -157,6 +180,10 @@ func genSalt() (string, error) {
 	return sb.String(), nil
 }
 
+func uriForZone(zone string, resource string) string {
+	return fmt.Sprintf("%s/dns/%s/%s", apiBase, zone, resource)
+}
+
 // See `innerGetAuthValue` for details.
 func (p *Provider) getAuthValue(req *http.Request) (string, error) {
 	salt, err := genSalt()
@@ -189,6 +216,10 @@ func (p *Provider) makeRequest(ctx context.Context, method string, url string, b
 		return nil, err
 	}
 
+	if body != nil {
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	}
+
 	authValue, err := p.getAuthValue(req)
 
 	if err != nil {
@@ -201,7 +232,7 @@ func (p *Provider) makeRequest(ctx context.Context, method string, url string, b
 
 // GetRecords lists all the records in the zone.
 func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record, error) {
-	resp, err := p.makeRequest(ctx, "POST", fmt.Sprintf("%s/dns/%s/listRRs", apiBase, zone), nil)
+	resp, err := p.makeRequest(ctx, "POST", uriForZone(zone, "listRRs"), nil)
 
 	if err != nil {
 		return nil, err
@@ -235,23 +266,70 @@ func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record
 	return records, nil
 }
 
-// AppendRecords adds records to the zone. It returns the records that were added.
+// AppendRecords adds records to the zone. It returns the records that were added. In the case where
+// only some records succeed returns both the records that were added and an error.
 func (p *Provider) AppendRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	// https://members.nearlyfreespeech.net/wiki/API/DNSAddRR
-	return nil, fmt.Errorf("TODO: not implemented")
+	uri := uriForZone(zone, "addRR")
+	var successfulRecords []libdns.Record
+
+	for _, record := range records {
+		params := toNfsnRecordParameters(record)
+		resp, err := p.makeRequest(ctx, "POST", uri, strings.NewReader(params.Encode()))
+
+		if err != nil {
+			return successfulRecords, err
+		}
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return successfulRecords, fmt.Errorf("API returned non-success status code %s", resp.Status)
+		}
+
+		successfulRecords = append(successfulRecords, record)
+	}
+
+	return successfulRecords, nil
 }
 
-// SetRecords sets the records in the zone, either by updating existing records or creating new ones.
-// It returns the updated records.
+// SetRecords sets the records in the zone, either by updating existing records or creating new
+// ones.  It returns the updated records. In the case where only some records succeed returns both
+// the records that were replaced and an error.
 func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
 	// https://members.nearlyfreespeech.net/wiki/API/DNSReplaceRR
-	return nil, fmt.Errorf("TODO: not implemented")
+	uri := uriForZone(zone, "replaceRR")
+	var successfulRecords []libdns.Record
+
+	for _, record := range records {
+		params := toNfsnRecordParameters(record)
+		_, err := p.makeRequest(ctx, "POST", uri, strings.NewReader(params.Encode()))
+
+		if err != nil {
+			return successfulRecords, err
+		}
+
+		successfulRecords = append(successfulRecords, record)
+	}
+
+	return successfulRecords, nil
 }
 
-// DeleteRecords deletes the records from the zone. It returns the records that were deleted.
+// DeleteRecords deletes the records from the zone. It returns the records that were deleted. In the
+// case where only some records succeed returns both the records that were deleted and an error.
 func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	// https://members.nearlyfreespeech.net/wiki/API/DNSRemoveRR
-	return nil, fmt.Errorf("TODO: not implemented")
+	uri := uriForZone(zone, "removeRR")
+	var successfulRecords []libdns.Record
+
+	for _, record := range records {
+		params := toNfsnRecordParameters(record)
+		_, err := p.makeRequest(ctx, "POST", uri, strings.NewReader(params.Encode()))
+
+		if err != nil {
+			return successfulRecords, err
+		}
+
+		successfulRecords = append(successfulRecords, record)
+	}
+
+	return successfulRecords, nil
 }
 
 // Interface guards

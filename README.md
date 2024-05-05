@@ -10,8 +10,8 @@ Be sure to update:
 - [X] The latest `libdns/libdns` version in go.mod
 - [ ] All comments and documentation, including README below and godocs
 - [X] License (must be compatible with Apache/MIT)
-- [ ] All "TODO:"s is in the code
-- [ ] All methods that currently do nothing
+- [X] All "TODO:"s is in the code
+- [X] All methods that currently do nothing
 - [ ] Remove this section from the readme before publishing.
 
 ---

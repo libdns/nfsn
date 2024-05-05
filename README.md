@@ -7,7 +7,15 @@ This package implements the [libdns interfaces](https://github.com/libdns/libdns
 [nearlyfreespeech.net](https://www.nearlyfreespeech.net), allowing you to manage DNS records hosted
 there.
 
-TODO: Show how to configure and use. Explain any caveats.
+## Configuration
+
+The `Provider` requires two pieces of information to operate:
+
+1. A `Login` - this is your NFSN login, i.e. the "Login Name" you provide when authenticating
+   against https://members.nearlyfreespeech.net
+2. An `APIKey` - obtained by logging into NFSN, navigating to the 'profile' tab, and selecting
+   'Manage API Key'. More details on obtaining and managing API keys are available in the [NFSN
+   FAQs](https://members.nearlyfreespeech.net/faq).
 
 ## CLI
 

@@ -17,6 +17,11 @@ The `Provider` requires two pieces of information to operate:
    'Manage API Key'. More details on obtaining and managing API keys are available in the [NFSN
    FAQs](https://members.nearlyfreespeech.net/faq).
 
+## Caveats
+
+The API that backs `SetRecords` only supports `A` and `AAAA` records. All other record types need to
+be deleted and re-created in separate steps.
+
 ## CLI
 
 `cli/cli.go` contains a (bare bones) CLI driver for the package. To use it, put an NFSN API key in a

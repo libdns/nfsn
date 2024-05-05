@@ -302,7 +302,7 @@ func (p *Provider) AppendRecords(ctx context.Context, zone string, records []lib
 }
 
 // SetRecords sets the records in the zone, either by updating existing records or creating new
-// ones.  It returns the updated records. In the case where only some records succeed returns both
+// ones. It returns the updated records. In the case where only some records succeed returns both
 // the records that were replaced and an error.
 func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
 	return p.processRecords(ctx, zone, "replaceRR", records)

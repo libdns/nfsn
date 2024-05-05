@@ -108,7 +108,7 @@ func toNfsnRecordParameters(record libdns.Record) url.Values {
 
 	dataBuilder.WriteString(record.Value)
 
-	parameters :=  url.Values{}
+	parameters := url.Values{}
 	parameters.Set("name", record.Name)
 	parameters.Set("type", record.Type)
 	parameters.Set("data", dataBuilder.String())
@@ -227,7 +227,36 @@ func (p *Provider) makeRequest(ctx context.Context, method string, url string, b
 	}
 
 	req.Header.Add(authHeader, authValue)
-	return p.client.Do(req)
+
+	resp, err := p.client.Do(req)
+	bodyBytes, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("API returned non-success status code %s with response body %s. Original error: %w", resp.Status, string(bodyBytes), err)
+	}
+
+	return resp, err
+}
+
+// Execute the given `verb` for each record in `records`. Accumulate successfully process records
+// and return them at the end. If only some records are processed, returns those that were
+// successfull _and_ an error.
+func (p *Provider) processRecords(ctx context.Context, zone string, verb string, records []libdns.Record) ([]libdns.Record, error) {
+	uri := uriForZone(zone, verb)
+	var successfulRecords []libdns.Record
+
+	for _, record := range records {
+		params := toNfsnRecordParameters(record)
+		_, err := p.makeRequest(ctx, "POST", uri, strings.NewReader(params.Encode()))
+
+		if err != nil {
+			return successfulRecords, err
+		}
+
+		successfulRecords = append(successfulRecords, record)
+	}
+
+	return successfulRecords, nil
 }
 
 // GetRecords lists all the records in the zone.
@@ -269,67 +298,20 @@ func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record
 // AppendRecords adds records to the zone. It returns the records that were added. In the case where
 // only some records succeed returns both the records that were added and an error.
 func (p *Provider) AppendRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	uri := uriForZone(zone, "addRR")
-	var successfulRecords []libdns.Record
-
-	for _, record := range records {
-		params := toNfsnRecordParameters(record)
-		resp, err := p.makeRequest(ctx, "POST", uri, strings.NewReader(params.Encode()))
-
-		if err != nil {
-			return successfulRecords, err
-		}
-
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			return successfulRecords, fmt.Errorf("API returned non-success status code %s", resp.Status)
-		}
-
-		successfulRecords = append(successfulRecords, record)
-	}
-
-	return successfulRecords, nil
+	return p.processRecords(ctx, zone, "addRR", records)
 }
 
 // SetRecords sets the records in the zone, either by updating existing records or creating new
 // ones.  It returns the updated records. In the case where only some records succeed returns both
 // the records that were replaced and an error.
 func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	// https://members.nearlyfreespeech.net/wiki/API/DNSReplaceRR
-	uri := uriForZone(zone, "replaceRR")
-	var successfulRecords []libdns.Record
-
-	for _, record := range records {
-		params := toNfsnRecordParameters(record)
-		_, err := p.makeRequest(ctx, "POST", uri, strings.NewReader(params.Encode()))
-
-		if err != nil {
-			return successfulRecords, err
-		}
-
-		successfulRecords = append(successfulRecords, record)
-	}
-
-	return successfulRecords, nil
+	return p.processRecords(ctx, zone, "replaceRR", records)
 }
 
 // DeleteRecords deletes the records from the zone. It returns the records that were deleted. In the
 // case where only some records succeed returns both the records that were deleted and an error.
 func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	uri := uriForZone(zone, "removeRR")
-	var successfulRecords []libdns.Record
-
-	for _, record := range records {
-		params := toNfsnRecordParameters(record)
-		_, err := p.makeRequest(ctx, "POST", uri, strings.NewReader(params.Encode()))
-
-		if err != nil {
-			return successfulRecords, err
-		}
-
-		successfulRecords = append(successfulRecords, record)
-	}
-
-	return successfulRecords, nil
+	return p.processRecords(ctx, zone, "removeRR", records)
 }
 
 // Interface guards

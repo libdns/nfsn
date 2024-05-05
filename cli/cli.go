@@ -17,7 +17,9 @@ type operation string
 
 const(
 	OperationAddRecord = "AddRecord"
+	OperationDeleteRecord = "DeleteRecord"
 	OperationGetRecords = "GetRecords"
+	OperationSetRecord = "SetRecord"
 )
 
 func (o *operation) String() string {
@@ -26,10 +28,14 @@ func (o *operation) String() string {
 
 func (o *operation) Set(value string) error {
 	switch value {
-	case OperationGetRecords:
-		*o = OperationGetRecords
 	case OperationAddRecord:
 		*o = OperationAddRecord
+	case OperationDeleteRecord:
+		*o = OperationDeleteRecord
+	case OperationGetRecords:
+		*o = OperationGetRecords
+	case OperationSetRecord:
+		*o = OperationSetRecord
 	default:
 		return fmt.Errorf("Unsupported operation %s", value)
 	}
@@ -62,7 +68,7 @@ func main() {
 	tArg := flag.String("t", "", "The type of record to operate on")
 	nArg := flag.String("n", "", "The name of the record to operate on")
 	dArg := flag.String("d", "", "The record data to write, if applicable")
-	flag.Var(&oArg, "o", "The operation to perform. Supported values are: AddRecord, GetRecords")
+	flag.Var(&oArg, "o", "The operation to perform. Supported values are: AddRecord, DeleteRecord, GetRecords, SetRecord")
 	flag.Parse()
 
 	apiKey, err := readApiKey(*fArg)
@@ -94,21 +100,34 @@ func main() {
 			fmt.Printf("%+v\n\n", r)
 		}
 	case OperationAddRecord:
+		fallthrough
+	case OperationDeleteRecord:
+		fallthrough
+	case OperationSetRecord:
 		record := libdns.Record{
 			Type: *tArg,
 			Name: *nArg,
 			Value: *dArg,
 			TTL: 3600,
 		}
-		fmt.Printf("Adding record to zone %s in account %s with values:\n", *zArg, p.Login)
+		fmt.Printf("Processing record to zone %s in account %s with values:\n", *zArg, p.Login)
 		fmt.Printf("  Type: %s\n  Name: %s\n Value: %s\n", record.Type, record.Name, record.Value)
 
-		var toAdd []libdns.Record
-		toAdd = append(toAdd, record)
-		_, err := p.AppendRecords(context.TODO(), *zArg, toAdd)
+		var toProcess []libdns.Record
+		var err error
+		toProcess = append(toProcess, record)
+
+		switch oArg {
+		case OperationAddRecord:
+			_, err = p.AppendRecords(context.TODO(), *zArg, toProcess)
+		case OperationDeleteRecord:
+			_, err = p.DeleteRecords(context.TODO(), *zArg, toProcess)
+		case OperationSetRecord:
+			_, err = p.SetRecords(context.TODO(), *zArg, toProcess)
+		}
 
 		if err != nil {
-			fmt.Printf("Encountered error adding record: %v\n", err)
+			fmt.Printf("Encountered error processing record: %v\n", err)
 			os.Exit(1)
 		}
 

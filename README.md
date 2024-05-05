@@ -1,21 +1,3 @@
-**DEVELOPER INSTRUCTIONS:**
-
-This repo is a template for developers to use when creating new
-[libdns](https://github.com/libdns/libdns) provider implementations.
-
-Be sure to update:
-
-- [X] The package name
-- [X] The Go module name in go.mod
-- [X] The latest `libdns/libdns` version in go.mod
-- [ ] All comments and documentation, including README below and godocs
-- [X] License (must be compatible with Apache/MIT)
-- [X] All "TODO:"s is in the code
-- [X] All methods that currently do nothing
-- [ ] Remove this section from the readme before publishing.
-
----
-
 `nfsn` for [`libdns`](https://github.com/libdns/libdns)
 =======================
 
@@ -26,6 +8,20 @@ This package implements the [libdns interfaces](https://github.com/libdns/libdns
 there.
 
 TODO: Show how to configure and use. Explain any caveats.
+
+## CLI
+
+`cli/cli.go` contains a (bare bones) CLI driver for the package. To use it, put an NFSN API key in a
+file on disk. By default the tool will look for a file called `api_key.txt` in the current working
+directory. The `-f` argument allows specifying an alternative location and/or filename. The `-z`
+zone argument and the `-l` login argument are required for all commands. The CLI tool supports the
+following operations in the `-o` argument:
+
+* `GetRecords` retrieves the set of DNS records for the specified zone and prints them to stdout.
+* `AddRecord` adds a new record. Takes the `-t` type, `-n` name, and `-d` data arguments.
+* `DeleteRecord` deltes a record. Takes the `-t` type, `-n` name, and `-d` data arguments.
+* `SetRecord` replaces an existing A or AAAA record transactionally (the API does not support other
+  types of records). Takes the `-t` type, `-n` name, and `-d` data arguments.
 
 ## Reference
 

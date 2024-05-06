@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/libdns/libdns"
-	"github.com/libdns/nfsn"
+	"github.com/jterk/libdns-nfsn"
 )
 
 type operation string

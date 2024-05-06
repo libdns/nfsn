@@ -1,4 +1,4 @@
-module github.com/libdns/nfsn
+module github.com/jterk/libdns-nfsn
 
 go 1.18
 

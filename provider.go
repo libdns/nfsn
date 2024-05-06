@@ -23,6 +23,9 @@ import (
 const apiBase = "https://api.nearlyfreespeech.net"
 const authHeader = "X-NFSN-Authentication"
 
+// NFSN enforces a minimum TTL of 3 minutes
+const minimumTTL = 180 * time.Second
+
 // Constants used for API salt generation
 const saltChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijjklmnopqrstuvwxyz0123456789"
 const saltLen = 16
@@ -112,7 +115,14 @@ func toNfsnRecordParameters(record libdns.Record) url.Values {
 	parameters.Set("name", record.Name)
 	parameters.Set("type", record.Type)
 	parameters.Set("data", dataBuilder.String())
-	parameters.Set("ttl", fmt.Sprintf("%d", record.TTL))
+
+	ttl := record.TTL
+
+ 	if ttl < minimumTTL {
+		ttl = minimumTTL
+	}
+
+	parameters.Set("ttl", fmt.Sprintf("%d", int(ttl.Seconds())))
 
 	return parameters
 }
@@ -181,7 +191,7 @@ func genSalt() (string, error) {
 }
 
 func uriForZone(zone string, resource string) string {
-	return fmt.Sprintf("%s/dns/%s/%s", apiBase, zone, resource)
+	return fmt.Sprintf("%s/dns/%s/%s", apiBase, strings.TrimRight(zone, "."), resource)
 }
 
 // See `innerGetAuthValue` for details.

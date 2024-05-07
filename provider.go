@@ -239,7 +239,16 @@ func (p *Provider) makeRequest(ctx context.Context, method string, url string, b
 	req.Header.Add(authHeader, authValue)
 
 	resp, err := p.client.Do(req)
-	bodyBytes, _ := io.ReadAll(resp.Body)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var bodyBytes []byte
+
+	if resp.Body != nil {
+		bodyBytes, _ = io.ReadAll(resp.Body)
+	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("API returned non-success status code %s with response body %s. Original error: %w", resp.Status, string(bodyBytes), err)

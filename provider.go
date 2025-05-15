@@ -52,7 +52,7 @@ type nfsnRecord struct {
 }
 
 // The pieces necessary to make a request to create/update a record in NFSN. Differs slightly from
-// the fields in libdns.Record
+// the fields in libdns.Record - should re-test "aux" field not obvious it still exists...
 type nfsnRecordParameters struct {
 	Name string
 	Type string
@@ -60,6 +60,10 @@ type nfsnRecordParameters struct {
 	TTL  int
 }
 
+// Supported records are A, AAAA, CNAME, MX, NS, PTR, SRV, TXT.
+//
+// Maybe produce RR structs and then cast? Seems like the best idea since it eliminates the special
+// case parsing below. Mmm not quite because of 'Aux' field?
 func (nRecord nfsnRecord) Record() (libdns.Record, error) {
 	record := libdns.Record{
 		Type:  nRecord.Type,
@@ -257,7 +261,7 @@ func (p *Provider) makeRequest(ctx context.Context, method string, url string, b
 	return resp, err
 }
 
-// Execute the given `verb` for each record in `records`. Accumulate successfully process records
+// Execute the given `verb` for each record in `records`. Accumulate successfully processed records
 // and return them at the end. If only some records are processed, returns those that were
 // successfull _and_ an error.
 func (p *Provider) processRecords(ctx context.Context, zone string, verb string, records []libdns.Record) ([]libdns.Record, error) {

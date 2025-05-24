@@ -76,6 +76,26 @@ func assertCname(t *testing.T, record libdns.Record, name string, target string,
 	}
 }
 
+func assertNs(t *testing.T, record libdns.Record, name string, target string, ttl int) {
+	switch tr := record.(type) {
+	case libdns.NS:
+		if tr.Name != name {
+			t.Errorf("Expected Name '%s' but got %v", name, tr.Name)
+		}
+		if tr.Target != target {
+			t.Errorf("Expected Target '%s' but got %v", target, tr.Target)
+		}
+		if tr.TTL != time.Second*time.Duration(ttl) {
+			t.Errorf("Expected %d second timeout but got %v", ttl, tr.TTL)
+		}
+		if tr.ProviderData != nil {
+			t.Errorf("Expected nil ProviderData but got %v", tr.ProviderData)
+		}
+	default:
+		t.Errorf("Expected a NS but got %v", tr)
+	}
+}
+
 func TestRecord(t *testing.T) {
 	// A
 	nRecord := nfsnRecord{
@@ -153,6 +173,30 @@ func TestRecord(t *testing.T) {
 	assertCname(t, r, "test", "www.test.com.", 300)
 
 	// NS
+	nRecord = nfsnRecord{
+		Type: "NS",
+		Name: "",
+		Data: "ns1.test.com",
+		TTL:  300,
+	}
+
+	r, err = nRecord.Record()
+
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+
+	assertNs(t, r, "@", "ns1.test.com", 300)
+
+	nRecord.Name = "test"
+
+	r, err = nRecord.Record()
+
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+
+	assertNs(t, r, "test", "ns1.test.com", 300)
 
 	// PTR
 

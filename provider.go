@@ -87,6 +87,12 @@ func (nRecord nfsnRecord) Record() (libdns.Record, error) {
 			Target: nRecord.Data,
 			TTL:    time.Second * time.Duration(nRecord.TTL),
 		}, nil
+	case "NS":
+		return libdns.NS{
+			Name:   nameForLibdns(nRecord.Name),
+			Target: nRecord.Data,
+			TTL:    time.Second * time.Duration(nRecord.TTL),
+		}, nil
 	default:
 		return libdns.RR{}, fmt.Errorf("Unsupported record type %s", nRecord.Type)
 	}
@@ -107,31 +113,31 @@ func toNfsnRecordParameters(record libdns.Record) url.Values {
 	return url.Values{}
 
 	/*
-		switch record.Type {
-		case "HTTPS":
-		case "MX":
-			dataBuilder.WriteString(fmt.Sprintf("%d ", record.Priority))
-		case "SRV":
-		case "URI":
-			dataBuilder.WriteString(fmt.Sprintf("%d %d ", record.Priority, record.Weight))
-		}
+			switch record.Type {
+			case "HTTPS":
+			case "MX":
+				dataBuilder.WriteString(fmt.Sprintf("%d ", record.Priority))
+			case "SRV":
+			case "URI":
+				dataBuilder.WriteString(fmt.Sprintf("%d %d ", record.Priority, record.Weight))
+			}
 
-		dataBuilder.WriteString(record.Value)
+			dataBuilder.WriteString(record.Value)
 
-		parameters := url.Values{}
-		parameters.Set("name", record.Name)
-		parameters.Set("type", record.Type)
-		parameters.Set("data", dataBuilder.String())
+			parameters := url.Values{}
+			parameters.Set("name", record.Name)
+			parameters.Set("type", record.Type)
+			parameters.Set("data", dataBuilder.String())
 
-		ttl := record.TTL
+			ttl := record.TTL
 
-	 	if ttl < minimumTTL {
-			ttl = minimumTTL
-		}
+		 	if ttl < minimumTTL {
+				ttl = minimumTTL
+			}
 
-		parameters.Set("ttl", fmt.Sprintf("%d", int(ttl.Seconds())))
+			parameters.Set("ttl", fmt.Sprintf("%d", int(ttl.Seconds())))
 
-		return parameters
+			return parameters
 	*/
 }
 

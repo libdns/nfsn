@@ -93,6 +93,14 @@ func (nRecord nfsnRecord) Record() (libdns.Record, error) {
 			Target: nRecord.Data,
 			TTL:    time.Second * time.Duration(nRecord.TTL),
 		}, nil
+	case "PTR":
+		// libdns doesn't have a PTR type so return an RR directly
+		return libdns.RR{
+			Type: "PTR",
+			Name: nameForLibdns(nRecord.Name),
+			Data: nRecord.Data,
+			TTL:  time.Second * time.Duration(nRecord.TTL),
+		}, nil
 	default:
 		return libdns.RR{}, fmt.Errorf("Unsupported record type %s", nRecord.Type)
 	}

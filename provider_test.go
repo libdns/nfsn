@@ -96,6 +96,29 @@ func assertNs(t *testing.T, record libdns.Record, name string, target string, tt
 	}
 }
 
+func assertMx(t *testing.T, record libdns.Record, name string, target string, preference int, ttl int) {
+	switch tr := record.(type) {
+	case libdns.MX:
+		if tr.Name != name {
+			t.Errorf("Expected Name '%s' but got %v", name, tr.Name)
+		}
+		if tr.Target != target {
+			t.Errorf("Expected Target '%s' but got %v", target, tr.Target)
+		}
+		if tr.TTL != time.Second*time.Duration(ttl) {
+			t.Errorf("Expected %d second timeout but got %v", ttl, tr.TTL)
+		}
+		if tr.Preference != uint16(preference) {
+			t.Errorf("Expected preference %d but got %v", preference, tr.Preference)
+		}
+		if tr.ProviderData != nil {
+			t.Errorf("Expected nil ProviderData but got %v", tr.ProviderData)
+		}
+	default:
+		t.Errorf("Expected an MX but got %v", tr)
+	}
+}
+
 func assertPtr(t *testing.T, record libdns.Record, name string, target string, ttl int) {
 	switch tr := record.(type) {
 	case libdns.RR:
@@ -245,6 +268,31 @@ func TestRecord(t *testing.T) {
 	assertPtr(t, r, "test", "test.com", 300)
 
 	// MX
+	nRecord = nfsnRecord{
+		Type: "MX",
+		Name: "",
+		Data: "test.com",
+		Aux:  10,
+		TTL:  300,
+	}
+
+	r, err = nRecord.Record()
+
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+
+	assertMx(t, r, "@", "test.com", 10, 300)
+
+	nRecord.Name = "test"
+
+	r, err = nRecord.Record()
+
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+
+	assertMx(t, r, "test", "test.com", 10, 300)
 
 	// SRV
 

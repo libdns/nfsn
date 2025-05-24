@@ -11,8 +11,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/netip"
 	"net/url"
-	"strconv"
+	// "strconv"
 	"strings"
 	"sync"
 	"time"
@@ -65,70 +66,73 @@ type nfsnRecordParameters struct {
 // Maybe produce RR structs and then cast? Seems like the best idea since it eliminates the special
 // case parsing below. Mmm not quite because of 'Aux' field?
 func (nRecord nfsnRecord) Record() (libdns.Record, error) {
-	record := libdns.Record{
-		Type:  nRecord.Type,
-		Name:  nRecord.Name,
-		Value: nRecord.Data,
-		TTL:   time.Second * time.Duration(nRecord.TTL),
-	}
-
 	switch nRecord.Type {
-	case "HTTPS":
-	case "MX":
-		record.Priority = uint(nRecord.Aux)
-	case "SRV":
-	case "URI":
-		// Priority is in the 'aux' field from NFSN
-		record.Priority = uint(nRecord.Aux)
-
-		// Data is "weight port target", libdns expects weight in the record
-		parts := strings.SplitN(nRecord.Data, " ", 2)
-
-		if len(parts) != 3 {
-			return libdns.Record{}, fmt.Errorf("%s record %s has incorrect format", nRecord.Name, nRecord.Data)
-		}
-
-		weight, err := strconv.Atoi(parts[0])
+	case "A":
+		fallthrough
+	case "AAAA":
+		addr, err := netip.ParseAddr(nRecord.Data)
 
 		if err != nil {
-			return libdns.Record{}, err
+			return libdns.RR{}, err
 		}
 
-		record.Weight = uint(weight)
-		record.Value = parts[1]
+		return libdns.Address{
+			Name: nameForLibdns(nRecord.Name),
+			IP:   addr,
+			TTL:  time.Second * time.Duration(nRecord.TTL),
+		}, nil
+	case "CNAME":
+		return libdns.CNAME{
+			Name:   nameForLibdns(nRecord.Name),
+			Target: nRecord.Data,
+			TTL:    time.Second * time.Duration(nRecord.TTL),
+		}, nil
+	default:
+		return libdns.RR{}, fmt.Errorf("Unsupported record type %s", nRecord.Type)
+	}
+}
+
+func nameForLibdns(nfsName string) string {
+	if nfsName != "" {
+		return nfsName
 	}
 
-	return record, nil
+	return "@"
 }
 
 func toNfsnRecordParameters(record libdns.Record) url.Values {
-	var dataBuilder strings.Builder
+	// var dataBuilder strings.Builder
 
-	switch record.Type {
-	case "HTTPS":
-	case "MX":
-		dataBuilder.WriteString(fmt.Sprintf("%d ", record.Priority))
-	case "SRV":
-	case "URI":
-		dataBuilder.WriteString(fmt.Sprintf("%d %d ", record.Priority, record.Weight))
-	}
+	// TODO FIXME
+	return url.Values{}
 
-	dataBuilder.WriteString(record.Value)
+	/*
+		switch record.Type {
+		case "HTTPS":
+		case "MX":
+			dataBuilder.WriteString(fmt.Sprintf("%d ", record.Priority))
+		case "SRV":
+		case "URI":
+			dataBuilder.WriteString(fmt.Sprintf("%d %d ", record.Priority, record.Weight))
+		}
 
-	parameters := url.Values{}
-	parameters.Set("name", record.Name)
-	parameters.Set("type", record.Type)
-	parameters.Set("data", dataBuilder.String())
+		dataBuilder.WriteString(record.Value)
 
-	ttl := record.TTL
+		parameters := url.Values{}
+		parameters.Set("name", record.Name)
+		parameters.Set("type", record.Type)
+		parameters.Set("data", dataBuilder.String())
 
- 	if ttl < minimumTTL {
-		ttl = minimumTTL
-	}
+		ttl := record.TTL
 
-	parameters.Set("ttl", fmt.Sprintf("%d", int(ttl.Seconds())))
+	 	if ttl < minimumTTL {
+			ttl = minimumTTL
+		}
 
-	return parameters
+		parameters.Set("ttl", fmt.Sprintf("%d", int(ttl.Seconds())))
+
+		return parameters
+	*/
 }
 
 // Constructs a value to pass into an X-NFSN-Authentication header.

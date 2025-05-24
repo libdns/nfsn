@@ -108,6 +108,12 @@ func (nRecord nfsnRecord) Record() (libdns.Record, error) {
 			TTL:        time.Second * time.Duration(nRecord.TTL),
 			Preference: uint16(nRecord.Aux),
 		}, nil
+	case "TXT":
+		return libdns.TXT{
+			Name: nameForLibdns(nRecord.Name),
+			Text: nRecord.Data,
+			TTL:  time.Second * time.Duration(nRecord.TTL),
+		}, nil
 	default:
 		return libdns.RR{}, fmt.Errorf("Unsupported record type %s", nRecord.Type)
 	}

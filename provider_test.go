@@ -972,3 +972,70 @@ func TestPtrParameters(t *testing.T) {
 		t.Errorf("Params has incorrect number of fields, expected 4 %v", params)
 	}
 }
+
+func TestSetRecordOperations(t *testing.T) {
+	r1 := libdns.TXT{
+		Name: "@",
+		Text: "some text",
+	}
+	r2 := libdns.TXT{
+		Name: "@",
+		Text: "some other text",
+	}
+
+	ops := computeSetRecordsOperations([]libdns.Record{r1, r2})
+
+	if len(ops) != 2 {
+		t.Fatalf("ops has wrong length %d (expected 2)", len(ops))
+	}
+
+	if ops[0].verb != "replaceRR" {
+		t.Errorf("first op has wrong verb %s (expected replaceRR)", ops[0].verb)
+	}
+
+	if ops[1].verb != "addRR" {
+		t.Errorf("second op has wrong verb %s (expected replaceRR)", ops[0].verb)
+	}
+
+	if ops[0].record.RR().Data == ops[1].record.RR().Data {
+		t.Errorf("ops have same Data value")
+	}
+
+	r3 := libdns.TXT{
+		Name: "test",
+		Text: "different text",
+	}
+
+	ops = computeSetRecordsOperations([]libdns.Record{r1, r3, r2})
+
+	if len(ops) != 3 {
+		t.Errorf("ops has wrong length %d (expected 2)", len(ops))
+	}
+
+	foundZoneReplace := false
+	foundr3 := false
+
+	for _, r := range ops {
+		if r.record.RR().Name == "test" {
+			if foundr3 {
+				t.Errorf("Seems like r3 is here more than once")
+			}
+
+			foundr3 = true
+
+			if r.verb != "replaceRR" {
+				t.Errorf("Verb %s is incorrect for r3", r.verb)
+			}
+
+			break
+		}
+
+		if r.verb == "replaceRR" {
+			if foundZoneReplace {
+				t.Errorf("Replace encountered more than once")
+			}
+
+			foundZoneReplace = true
+		}
+	}
+}

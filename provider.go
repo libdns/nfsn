@@ -439,16 +439,21 @@ func (p *Provider) makeRequest(ctx context.Context, method string, url string, b
 	return resp, err
 }
 
-// Execute the given `verb` for each record in `records`. Accumulate successfully processed records
-// and return them at the end. If only some records are processed, returns those that were
-// successfull _and_ an error.
-func (p *Provider) processRecords(ctx context.Context, zone string, verb string, records []libdns.Record) ([]libdns.Record, error) {
-	uri := uriForZone(zone, verb)
+type recordOperation struct {
+	verb   string
+	record libdns.Record
+}
+
+// Execute operations in ops. Accumulate successfully processed records and return them at the
+// end. If only some records are processed, returns those that were successfull _and_ an error.
+func (p *Provider) processRecords(ctx context.Context, zone string, ops []recordOperation) ([]libdns.Record, error) {
 	var successfulRecords []libdns.Record
 
-	for _, record := range records {
+	for _, op := range ops {
+		uri := uriForZone(zone, op.verb)
+
 		// TODO consider doing all this up front so that invalid records are caught before mutation
-		params, err := toNfsnRecordParameters(record)
+		params, err := toNfsnRecordParameters(op.record)
 
 		if err != nil {
 			return successfulRecords, err
@@ -460,7 +465,7 @@ func (p *Provider) processRecords(ctx context.Context, zone string, verb string,
 			return successfulRecords, err
 		}
 
-		successfulRecords = append(successfulRecords, record)
+		successfulRecords = append(successfulRecords, op.record)
 	}
 
 	return successfulRecords, nil
@@ -504,7 +509,37 @@ func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record
 
 // See libdns.RecordAppender
 func (p *Provider) AppendRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	return p.processRecords(ctx, zone, "addRR", records)
+	ops := make([]recordOperation, 0, len(records))
+
+	for _, r := range records {
+		ops = append(ops, recordOperation{"addRR", r})
+	}
+
+	return p.processRecords(ctx, zone, ops)
+}
+
+func computeSetRecordsOperations(records []libdns.Record) []recordOperation {
+	ops := make([]recordOperation, 0, len(records))
+	opsByNameType := make(map[string][]recordOperation)
+
+	for _, r := range records {
+		k := fmt.Sprintf("%s%s", r.RR().Name, r.RR().Type)
+		verb := "replaceRR"
+
+		if len(opsByNameType[k]) > 0 {
+			verb = "addRR"
+		}
+
+		opsByNameType[k] = append(opsByNameType[k], recordOperation{verb, r})
+	}
+
+	for k := range opsByNameType {
+		for _, op := range opsByNameType[k] {
+			ops = append(ops, op)
+		}
+	}
+
+	return ops
 }
 
 // See libdns.RecordSetter
@@ -513,13 +548,19 @@ func (p *Provider) AppendRecords(ctx context.Context, zone string, records []lib
 // one will be attempted serially. In the case where only some operations succeed, returns both the
 // records that were set (if any) and an error.
 func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	// FIXME Should be one replaceRR followed by any number of addRR requests for each (name, type) pair
-	return p.processRecords(ctx, zone, "replaceRR", records)
+	ops := computeSetRecordsOperations(records)
+	return p.processRecords(ctx, zone, ops)
 }
 
 // See libdns.RecordDeleter
 func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	return p.processRecords(ctx, zone, "removeRR", records)
+	ops := make([]recordOperation, 0, len(records))
+
+	for _, r := range records {
+		ops = append(ops, recordOperation{"removeRR", r})
+	}
+
+	return p.processRecords(ctx, zone, ops)
 }
 
 // Interface guards

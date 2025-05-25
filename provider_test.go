@@ -203,8 +203,7 @@ func assertSrv(
 	}
 }
 
-func TestRecord(t *testing.T) {
-	// A
+func TestARecord(t *testing.T) {
 	nRecord := nfsnRecord{
 		Type: "A",
 		Name: "",
@@ -229,13 +228,17 @@ func TestRecord(t *testing.T) {
 	}
 
 	assertAddress(t, r, "test", "192.168.0.0", 300)
+}
 
-	// AAAA
-	nRecord.Type = "AAAA"
-	nRecord.Name = ""
-	nRecord.Data = "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+func TestAAAARecord(t *testing.T) {
+	nRecord := nfsnRecord{
+		Type: "AAAA",
+		Name: "",
+		Data: "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+		TTL:  300,
+	}
 
-	r, err = nRecord.Record()
+	r, err := nRecord.Record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -252,16 +255,17 @@ func TestRecord(t *testing.T) {
 	}
 
 	assertAddress(t, r, "test", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", 300)
+}
 
-	// CNAME
-	nRecord = nfsnRecord{
+func TestCNAMERecord(t *testing.T) {
+	nRecord := nfsnRecord{
 		Type: "CNAME",
 		Name: "",
 		Data: "www.test.com.",
 		TTL:  300,
 	}
 
-	r, err = nRecord.Record()
+	r, err := nRecord.Record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -278,16 +282,17 @@ func TestRecord(t *testing.T) {
 	}
 
 	assertCname(t, r, "test", "www.test.com.", 300)
+}
 
-	// NS
-	nRecord = nfsnRecord{
+func TestNSRecord(t *testing.T) {
+	nRecord := nfsnRecord{
 		Type: "NS",
 		Name: "",
 		Data: "ns1.test.com",
 		TTL:  300,
 	}
 
-	r, err = nRecord.Record()
+	r, err := nRecord.Record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -304,16 +309,17 @@ func TestRecord(t *testing.T) {
 	}
 
 	assertNs(t, r, "test", "ns1.test.com", 300)
+}
 
-	// PTR
-	nRecord = nfsnRecord{
+func TestPTRRecord(t *testing.T) {
+	nRecord := nfsnRecord{
 		Type: "PTR",
 		Name: "",
 		Data: "test.com",
 		TTL:  300,
 	}
 
-	r, err = nRecord.Record()
+	r, err := nRecord.Record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -330,9 +336,10 @@ func TestRecord(t *testing.T) {
 	}
 
 	assertPtr(t, r, "test", "test.com", 300)
+}
 
-	// MX
-	nRecord = nfsnRecord{
+func TestMXRecord(t *testing.T) {
+	nRecord := nfsnRecord{
 		Type: "MX",
 		Name: "",
 		Data: "test.com",
@@ -340,7 +347,7 @@ func TestRecord(t *testing.T) {
 		TTL:  300,
 	}
 
-	r, err = nRecord.Record()
+	r, err := nRecord.Record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -357,9 +364,10 @@ func TestRecord(t *testing.T) {
 	}
 
 	assertMx(t, r, "test", "test.com", 10, 300)
+}
 
-	// SRV
-	nRecord = nfsnRecord{
+func TestSRVRecord(t *testing.T) {
+	nRecord := nfsnRecord{
 		Type: "SRV",
 		Name: "_jabber._tcp",
 		Data: "2 3 test.com.",
@@ -368,7 +376,7 @@ func TestRecord(t *testing.T) {
 		TTL: 300,
 	}
 
-	r, err = nRecord.Record()
+	r, err := nRecord.Record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -442,16 +450,17 @@ func TestRecord(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error from invalid SRV record")
 	}
+}
 
-	// TXT
-	nRecord = nfsnRecord{
+func TestTXTRecord(t *testing.T) {
+	nRecord := nfsnRecord{
 		Type: "TXT",
 		Name: "",
 		Data: "some text",
 		TTL:  300,
 	}
 
-	r, err = nRecord.Record()
+	r, err := nRecord.Record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)

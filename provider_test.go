@@ -211,7 +211,7 @@ func TestARecord(t *testing.T) {
 		TTL:  300,
 	}
 
-	r, err := nRecord.Record()
+	r, err := nRecord.record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -221,7 +221,7 @@ func TestARecord(t *testing.T) {
 
 	nRecord.Name = "test"
 
-	r, err = nRecord.Record()
+	r, err = nRecord.record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -238,7 +238,7 @@ func TestAAAARecord(t *testing.T) {
 		TTL:  300,
 	}
 
-	r, err := nRecord.Record()
+	r, err := nRecord.record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -248,7 +248,7 @@ func TestAAAARecord(t *testing.T) {
 
 	nRecord.Name = "test"
 
-	r, err = nRecord.Record()
+	r, err = nRecord.record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -265,7 +265,7 @@ func TestCNAMERecord(t *testing.T) {
 		TTL:  300,
 	}
 
-	r, err := nRecord.Record()
+	r, err := nRecord.record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -275,7 +275,7 @@ func TestCNAMERecord(t *testing.T) {
 
 	nRecord.Name = "test"
 
-	r, err = nRecord.Record()
+	r, err = nRecord.record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -292,7 +292,7 @@ func TestNSRecord(t *testing.T) {
 		TTL:  300,
 	}
 
-	r, err := nRecord.Record()
+	r, err := nRecord.record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -302,7 +302,7 @@ func TestNSRecord(t *testing.T) {
 
 	nRecord.Name = "test"
 
-	r, err = nRecord.Record()
+	r, err = nRecord.record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -319,7 +319,7 @@ func TestPTRRecord(t *testing.T) {
 		TTL:  300,
 	}
 
-	r, err := nRecord.Record()
+	r, err := nRecord.record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -329,7 +329,7 @@ func TestPTRRecord(t *testing.T) {
 
 	nRecord.Name = "test"
 
-	r, err = nRecord.Record()
+	r, err = nRecord.record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -347,7 +347,7 @@ func TestMXRecord(t *testing.T) {
 		TTL:  300,
 	}
 
-	r, err := nRecord.Record()
+	r, err := nRecord.record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -357,7 +357,7 @@ func TestMXRecord(t *testing.T) {
 
 	nRecord.Name = "test"
 
-	r, err = nRecord.Record()
+	r, err = nRecord.record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -376,7 +376,7 @@ func TestSRVRecord(t *testing.T) {
 		TTL: 300,
 	}
 
-	r, err := nRecord.Record()
+	r, err := nRecord.record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -386,7 +386,7 @@ func TestSRVRecord(t *testing.T) {
 
 	nRecord.Name = "_jabber._tcp.test.com"
 
-	r, err = nRecord.Record()
+	r, err = nRecord.record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -396,7 +396,7 @@ func TestSRVRecord(t *testing.T) {
 
 	nRecord.Name = ""
 
-	r, err = nRecord.Record()
+	r, err = nRecord.record()
 
 	if err == nil || !strings.Contains(err.Error(), "Name value") {
 		t.Errorf("Expected error from invalid SRV record %v", err)
@@ -404,7 +404,7 @@ func TestSRVRecord(t *testing.T) {
 
 	nRecord.Name = "_jabber"
 
-	r, err = nRecord.Record()
+	r, err = nRecord.record()
 
 	if err == nil || !strings.Contains(err.Error(), "Name value") {
 		t.Errorf("Expected error from invalid SRV record %v", err)
@@ -413,7 +413,7 @@ func TestSRVRecord(t *testing.T) {
 	nRecord.Name = "_jabber._tcp"
 	nRecord.Data = "test.com"
 
-	r, err = nRecord.Record()
+	r, err = nRecord.record()
 
 	if err == nil || !strings.Contains(err.Error(), "Data value") {
 		t.Errorf("Expected error from invalid SRV record %v", err)
@@ -421,7 +421,7 @@ func TestSRVRecord(t *testing.T) {
 
 	nRecord.Data = "1 test.com"
 
-	r, err = nRecord.Record()
+	r, err = nRecord.record()
 
 	if err == nil || !strings.Contains(err.Error(), "Data value") {
 		t.Errorf("Expected error from invalid SRV record %v", err)
@@ -429,7 +429,7 @@ func TestSRVRecord(t *testing.T) {
 
 	nRecord.Data = "1 2 3 test.com"
 
-	r, err = nRecord.Record()
+	r, err = nRecord.record()
 
 	if err == nil || !strings.Contains(err.Error(), "Data value") {
 		t.Errorf("Expected error from invalid SRV record %v", err)
@@ -437,7 +437,7 @@ func TestSRVRecord(t *testing.T) {
 
 	nRecord.Data = "-1 2 test.com"
 
-	r, err = nRecord.Record()
+	r, err = nRecord.record()
 
 	if err == nil {
 		t.Errorf("Expected error from invalid SRV record")
@@ -445,7 +445,7 @@ func TestSRVRecord(t *testing.T) {
 
 	nRecord.Data = "1 -2 test.com"
 
-	r, err = nRecord.Record()
+	r, err = nRecord.record()
 
 	if err == nil {
 		t.Errorf("Expected error from invalid SRV record")
@@ -460,7 +460,7 @@ func TestTXTRecord(t *testing.T) {
 		TTL:  300,
 	}
 
-	r, err := nRecord.Record()
+	r, err := nRecord.record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -470,11 +470,505 @@ func TestTXTRecord(t *testing.T) {
 
 	nRecord.Name = "_prefix"
 
-	r, err = nRecord.Record()
+	r, err = nRecord.record()
 
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
 
 	assertTxt(t, r, "_prefix", "some text", 300)
+}
+
+func TestAParameters(t *testing.T) {
+	addr, _ := netip.ParseAddr("192.168.0.0")
+
+	r := libdns.Address{
+		Name: "@",
+		TTL:  time.Second * time.Duration(300),
+		IP:   addr,
+	}
+
+	params, err := toNfsnRecordParameters(r)
+
+	if err != nil {
+		t.Errorf("Expected no error but got %v", err)
+	}
+
+	if tp := params.Get("type"); tp != "A" {
+		t.Errorf("Expected type 'A' but got '%s'", tp)
+	}
+
+	if name := params.Get("name"); name != "" {
+		t.Errorf("Expected name '' but got '%s'", name)
+	}
+
+	if ttl := params.Get("ttl"); ttl != "300" {
+		t.Errorf("Expected ttl '300' but got '%s'", ttl)
+	}
+
+	if data := params.Get("data"); data != "192.168.0.0" {
+		t.Errorf("Expected data '192.168.0.0' but got '%s'", data)
+	}
+
+	if len(params) != 4 {
+		t.Errorf("Params has incorrect number of fields, expected 4 %v", params)
+	}
+
+	r = libdns.Address{
+		Name: "test",
+		TTL:  time.Second * time.Duration(300),
+		IP:   addr,
+	}
+
+	params, err = toNfsnRecordParameters(r)
+
+	if err != nil {
+		t.Errorf("Expected no error but got %v", err)
+	}
+
+	if tp := params.Get("type"); tp != "A" {
+		t.Errorf("Expected type 'A' but got '%s'", tp)
+	}
+
+	if name := params.Get("name"); name != "test" {
+		t.Errorf("Expected name 'test' but got '%s'", name)
+	}
+
+	if ttl := params.Get("ttl"); ttl != "300" {
+		t.Errorf("Expected ttl '300' but got '%s'", ttl)
+	}
+
+	if data := params.Get("data"); data != "192.168.0.0" {
+		t.Errorf("Expected data '192.168.0.0' but got '%s'", data)
+	}
+
+	if len(params) != 4 {
+		t.Errorf("Params has incorrect number of fields, expected 4 %v", params)
+	}
+}
+
+func TestCnameParameters(t *testing.T) {
+	r := libdns.CNAME{
+		Name:   "@",
+		TTL:    time.Second * time.Duration(300),
+		Target: "test.com",
+	}
+
+	params, err := toNfsnRecordParameters(r)
+
+	if err != nil {
+		t.Errorf("Expected no error but got %v", err)
+	}
+
+	if tp := params.Get("type"); tp != "CNAME" {
+		t.Errorf("Expected type 'CNAME' but got '%s'", tp)
+	}
+
+	if name := params.Get("name"); name != "" {
+		t.Errorf("Expected name '' but got '%s'", name)
+	}
+
+	if ttl := params.Get("ttl"); ttl != "300" {
+		t.Errorf("Expected ttl '300' but got '%s'", ttl)
+	}
+
+	if data := params.Get("data"); data != "test.com" {
+		t.Errorf("Expected data 'test.com' but got '%s'", data)
+	}
+
+	if len(params) != 4 {
+		t.Errorf("Params has incorrect number of fields, expected 4 %v", params)
+	}
+
+	r = libdns.CNAME{
+		Name:   "test",
+		TTL:    time.Second * time.Duration(300),
+		Target: "test.com",
+	}
+
+	params, err = toNfsnRecordParameters(r)
+
+	if err != nil {
+		t.Errorf("Expected no error but got %v", err)
+	}
+
+	if tp := params.Get("type"); tp != "CNAME" {
+		t.Errorf("Expected type 'CNAME' but got '%s'", tp)
+	}
+
+	if name := params.Get("name"); name != "test" {
+		t.Errorf("Expected name 'test' but got '%s'", name)
+	}
+
+	if ttl := params.Get("ttl"); ttl != "300" {
+		t.Errorf("Expected ttl '300' but got '%s'", ttl)
+	}
+
+	if data := params.Get("data"); data != "test.com" {
+		t.Errorf("Expected data 'test.com' but got '%s'", data)
+	}
+
+	if len(params) != 4 {
+		t.Errorf("Params has incorrect number of fields, expected 4 %v", params)
+	}
+}
+
+func TestMxParameters(t *testing.T) {
+	r := libdns.MX{
+		Name:       "@",
+		TTL:        time.Second * time.Duration(300),
+		Preference: 10,
+		Target:     "test.com",
+	}
+
+	params, err := toNfsnRecordParameters(r)
+
+	if err != nil {
+		t.Errorf("Expected no error but got %v", err)
+	}
+
+	if tp := params.Get("type"); tp != "MX" {
+		t.Errorf("Expected type 'MX' but got '%s'", tp)
+	}
+
+	if name := params.Get("name"); name != "" {
+		t.Errorf("Expected name '' but got '%s'", name)
+	}
+
+	if ttl := params.Get("ttl"); ttl != "300" {
+		t.Errorf("Expected ttl '300' but got '%s'", ttl)
+	}
+
+	if data := params.Get("data"); data != "test.com" {
+		t.Errorf("Expected data 'test.com' but got '%s'", data)
+	}
+
+	if aux := params.Get("aux"); aux != "10" {
+		t.Errorf("Expected aux '10' but got '%s'", aux)
+	}
+
+	if len(params) != 5 {
+		t.Errorf("Params has incorrect number of fields, expected 4 %v", params)
+	}
+
+	r = libdns.MX{
+		Name:       "test",
+		TTL:        time.Second * time.Duration(300),
+		Preference: 10,
+		Target:     "test.com",
+	}
+
+	params, err = toNfsnRecordParameters(r)
+
+	if err != nil {
+		t.Errorf("Expected no error but got %v", err)
+	}
+
+	if tp := params.Get("type"); tp != "MX" {
+		t.Errorf("Expected type 'MX' but got '%s'", tp)
+	}
+
+	if name := params.Get("name"); name != "test" {
+		t.Errorf("Expected name 'test' but got '%s'", name)
+	}
+
+	if ttl := params.Get("ttl"); ttl != "300" {
+		t.Errorf("Expected ttl '300' but got '%s'", ttl)
+	}
+
+	if data := params.Get("data"); data != "test.com" {
+		t.Errorf("Expected data 'test.com' but got '%s'", data)
+	}
+
+	if aux := params.Get("aux"); aux != "10" {
+		t.Errorf("Expected aux '10' but got '%s'", aux)
+	}
+
+	if len(params) != 5 {
+		t.Errorf("Params has incorrect number of fields, expected 4 %v", params)
+	}
+}
+
+func TestNsParameters(t *testing.T) {
+	r := libdns.NS{
+		Name:   "@",
+		TTL:    time.Second * time.Duration(300),
+		Target: "test.com",
+	}
+
+	params, err := toNfsnRecordParameters(r)
+
+	if err != nil {
+		t.Errorf("Expected no error but got %v", err)
+	}
+
+	if tp := params.Get("type"); tp != "NS" {
+		t.Errorf("Expected type 'NS' but got '%s'", tp)
+	}
+
+	if name := params.Get("name"); name != "" {
+		t.Errorf("Expected name '' but got '%s'", name)
+	}
+
+	if ttl := params.Get("ttl"); ttl != "300" {
+		t.Errorf("Expected ttl '300' but got '%s'", ttl)
+	}
+
+	if data := params.Get("data"); data != "test.com" {
+		t.Errorf("Expected data 'test.com' but got '%s'", data)
+	}
+
+	if len(params) != 4 {
+		t.Errorf("Params has incorrect number of fields, expected 4 %v", params)
+	}
+
+	r = libdns.NS{
+		Name:   "test",
+		TTL:    time.Second * time.Duration(300),
+		Target: "test.com",
+	}
+
+	params, err = toNfsnRecordParameters(r)
+
+	if err != nil {
+		t.Errorf("Expected no error but got %v", err)
+	}
+
+	if tp := params.Get("type"); tp != "NS" {
+		t.Errorf("Expected type 'NS' but got '%s'", tp)
+	}
+
+	if name := params.Get("name"); name != "test" {
+		t.Errorf("Expected name 'test' but got '%s'", name)
+	}
+
+	if ttl := params.Get("ttl"); ttl != "300" {
+		t.Errorf("Expected ttl '300' but got '%s'", ttl)
+	}
+
+	if data := params.Get("data"); data != "test.com" {
+		t.Errorf("Expected data 'test.com' but got '%s'", data)
+	}
+
+	if len(params) != 4 {
+		t.Errorf("Params has incorrect number of fields, expected 4 %v", params)
+	}
+}
+
+func TestSrvParameters(t *testing.T) {
+	r := libdns.SRV{
+		Service:   "xmpp",
+		Transport: "tcp",
+		Name:      "@",
+		TTL:       time.Second * time.Duration(300),
+		Priority:  10,
+		Weight:    20,
+		Port:      30,
+		Target:    "test.com",
+	}
+
+	params, err := toNfsnRecordParameters(r)
+
+	if err != nil {
+		t.Errorf("Expected no error but got %v", err)
+	}
+
+	if tp := params.Get("type"); tp != "SRV" {
+		t.Errorf("Expected type 'SRV' but got '%s'", tp)
+	}
+
+	if name := params.Get("name"); name != "_xmpp._tcp" {
+		t.Errorf("Expected name '_xmpp._tcp' but got '%s'", name)
+	}
+
+	if ttl := params.Get("ttl"); ttl != "300" {
+		t.Errorf("Expected ttl '300' but got '%s'", ttl)
+	}
+
+	if data := params.Get("data"); data != "20 30 test.com" {
+		t.Errorf("Expected data 'test.com' but got '%s'", data)
+	}
+
+	if aux := params.Get("aux"); aux != "10" {
+		t.Errorf("Expected aux '10' but got '%s'", aux)
+	}
+
+	if len(params) != 5 {
+		t.Errorf("Params has incorrect number of fields, expected 4 %v", params)
+	}
+
+	r = libdns.SRV{
+		Service:   "xmpp",
+		Transport: "tcp",
+		Name:      "test",
+		TTL:       time.Second * time.Duration(300),
+		Priority:  10,
+		Weight:    20,
+		Port:      30,
+		Target:    "test.com",
+	}
+
+	params, err = toNfsnRecordParameters(r)
+
+	if err != nil {
+		t.Errorf("Expected no error but got %v", err)
+	}
+
+	if tp := params.Get("type"); tp != "SRV" {
+		t.Errorf("Expected type 'SRV' but got '%s'", tp)
+	}
+
+	if name := params.Get("name"); name != "_xmpp._tcp.test" {
+		t.Errorf("Expected name '_xmpp._tcp' but got '%s'", name)
+	}
+
+	if ttl := params.Get("ttl"); ttl != "300" {
+		t.Errorf("Expected ttl '300' but got '%s'", ttl)
+	}
+
+	if data := params.Get("data"); data != "20 30 test.com" {
+		t.Errorf("Expected data 'test.com' but got '%s'", data)
+	}
+
+	if aux := params.Get("aux"); aux != "10" {
+		t.Errorf("Expected aux '10' but got '%s'", aux)
+	}
+
+	if len(params) != 5 {
+		t.Errorf("Params has incorrect number of fields, expected 4 %v", params)
+	}
+}
+
+func TestTxtParameters(t *testing.T) {
+	r := libdns.TXT{
+		Name: "@",
+		TTL:  time.Second * time.Duration(300),
+		Text: "some text",
+	}
+
+	params, err := toNfsnRecordParameters(r)
+
+	if err != nil {
+		t.Errorf("Expected no error but got %v", err)
+	}
+
+	if tp := params.Get("type"); tp != "TXT" {
+		t.Errorf("Expected type 'TXT' but got '%s'", tp)
+	}
+
+	if name := params.Get("name"); name != "" {
+		t.Errorf("Expected name '' but got '%s'", name)
+	}
+
+	if ttl := params.Get("ttl"); ttl != "300" {
+		t.Errorf("Expected ttl '300' but got '%s'", ttl)
+	}
+
+	if data := params.Get("data"); data != "some text" {
+		t.Errorf("Expected data 'some text' but got '%s'", data)
+	}
+
+	if len(params) != 4 {
+		t.Errorf("Params has incorrect number of fields, expected 4 %v", params)
+	}
+
+	r = libdns.TXT{
+		Name: "test",
+		TTL:  time.Second * time.Duration(300),
+		Text: "some text",
+	}
+
+	params, err = toNfsnRecordParameters(r)
+
+	if err != nil {
+		t.Errorf("Expected no error but got %v", err)
+	}
+
+	if tp := params.Get("type"); tp != "TXT" {
+		t.Errorf("Expected type 'TXT' but got '%s'", tp)
+	}
+
+	if name := params.Get("name"); name != "test" {
+		t.Errorf("Expected name 'test' but got '%s'", name)
+	}
+
+	if ttl := params.Get("ttl"); ttl != "300" {
+		t.Errorf("Expected ttl '300' but got '%s'", ttl)
+	}
+
+	if data := params.Get("data"); data != "some text" {
+		t.Errorf("Expected data 'some text' but got '%s'", data)
+	}
+
+	if len(params) != 4 {
+		t.Errorf("Params has incorrect number of fields, expected 4 %v", params)
+	}
+}
+
+func TestPtrParameters(t *testing.T) {
+	r := libdns.RR{
+		Type: "PTR",
+		Name: "@",
+		TTL:  time.Second * time.Duration(300),
+		Data: "test.com",
+	}
+
+	params, err := toNfsnRecordParameters(r)
+
+	if err != nil {
+		t.Errorf("Expected no error but got %v", err)
+	}
+
+	if tp := params.Get("type"); tp != "PTR" {
+		t.Errorf("Expected type 'PTR' but got '%s'", tp)
+	}
+
+	if name := params.Get("name"); name != "" {
+		t.Errorf("Expected name '' but got '%s'", name)
+	}
+
+	if ttl := params.Get("ttl"); ttl != "300" {
+		t.Errorf("Expected ttl '300' but got '%s'", ttl)
+	}
+
+	if data := params.Get("data"); data != "test.com" {
+		t.Errorf("Expected data 'test.com' but got '%s'", data)
+	}
+
+	if len(params) != 4 {
+		t.Errorf("Params has incorrect number of fields, expected 4 %v", params)
+	}
+
+	r = libdns.RR{
+		Type: "PTR",
+		Name: "test",
+		TTL:  time.Second * time.Duration(300),
+		Data: "test.com",
+	}
+
+	params, err = toNfsnRecordParameters(r)
+
+	if err != nil {
+		t.Errorf("Expected no error but got %v", err)
+	}
+
+	if tp := params.Get("type"); tp != "PTR" {
+		t.Errorf("Expected type 'PTR' but got '%s'", tp)
+	}
+
+	if name := params.Get("name"); name != "test" {
+		t.Errorf("Expected name 'test' but got '%s'", name)
+	}
+
+	if ttl := params.Get("ttl"); ttl != "300" {
+		t.Errorf("Expected ttl '300' but got '%s'", ttl)
+	}
+
+	if data := params.Get("data"); data != "test.com" {
+		t.Errorf("Expected data 'test.com' but got '%s'", data)
+	}
+
+	if len(params) != 4 {
+		t.Errorf("Params has incorrect number of fields, expected 4 %v", params)
+	}
 }

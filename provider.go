@@ -13,7 +13,7 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
-	// "strconv"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -113,6 +113,51 @@ func (nRecord nfsnRecord) Record() (libdns.Record, error) {
 			Name: nameForLibdns(nRecord.Name),
 			Text: nRecord.Data,
 			TTL:  time.Second * time.Duration(nRecord.TTL),
+		}, nil
+	case "SRV":
+		// Name is "_SERVICE._TRANSPORT.NAME" - NFSN allows .NAME to be omitted in which case the record
+		// is for the zone domain name. If .NAME is omitted, libdns expects the value "@". libdns also
+		// expects the service and transport values to omit the preceding '_' characters.
+		nameFields := strings.SplitN(nRecord.Name, ".", 3)
+
+		if len(nameFields) < 2 {
+			return libdns.RR{}, fmt.Errorf("Name value '%s' has too few fields, expected at least 2", nRecord.Name)
+		}
+
+		name := "@"
+
+		if len(nameFields) == 3 && nameFields[2] != "" {
+			name = nameFields[2]
+		}
+
+		// Data is "WEIGHT PORT TARGET", the priority is in the Aux field.
+		dataFields := strings.Fields(nRecord.Data)
+
+		if len(dataFields) != 3 {
+			return libdns.RR{}, fmt.Errorf("Data value '%s' has wrong number of fields, expected 3", nRecord.Data)
+		}
+
+		weight, err := strconv.ParseUint(dataFields[0], 10, 16)
+
+		if err != nil {
+			return libdns.RR{}, err
+		}
+
+		port, err := strconv.ParseUint(dataFields[1], 10, 16)
+
+		if err != nil {
+			return libdns.RR{}, err
+		}
+
+		return libdns.SRV{
+			Service:   strings.TrimPrefix(nameFields[0], "_"),
+			Transport: strings.TrimPrefix(nameFields[1], "_"),
+			Name:      name,
+			TTL:       time.Second * time.Duration(nRecord.TTL),
+			Priority:  uint16(nRecord.Aux),
+			Weight:    uint16(weight),
+			Port:      uint16(port),
+			Target:    dataFields[2],
 		}, nil
 	default:
 		return libdns.RR{}, fmt.Errorf("Unsupported record type %s", nRecord.Type)

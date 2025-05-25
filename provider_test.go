@@ -3,6 +3,7 @@ package nfsn
 import (
 	"net/http"
 	"net/netip"
+	"strings"
 	"testing"
 	"time"
 
@@ -156,6 +157,49 @@ func assertPtr(t *testing.T, record libdns.Record, name string, target string, t
 		}
 	default:
 		t.Errorf("Expected a PTR but got %v", tr)
+	}
+}
+
+func assertSrv(
+	t *testing.T,
+	record libdns.Record,
+	service string,
+	transport string,
+	name string,
+	target string,
+	priority int,
+	weight int,
+	port int,
+	ttl int,
+) {
+	switch tr := record.(type) {
+	case libdns.SRV:
+		if tr.Service != service {
+			t.Errorf("Expected Service '%s' but got %v", service, tr.Service)
+		}
+		if tr.Transport != transport {
+			t.Errorf("Expected Transport '%s' but got %v", transport, tr.Transport)
+		}
+		if tr.Name != name {
+			t.Errorf("Expected Name '%s' but got %v", name, tr.Name)
+		}
+		if tr.Target != target {
+			t.Errorf("Expected Target '%s' but got %v", target, tr.Target)
+		}
+		if tr.Priority != uint16(priority) {
+			t.Errorf("Expected Priority %d but got %v", priority, tr.Priority)
+		}
+		if tr.Weight != uint16(weight) {
+			t.Errorf("Expected Weight %d but got %v", weight, tr.Weight)
+		}
+		if tr.Port != uint16(port) {
+			t.Errorf("Expected Port %d but got %v", port, tr.Port)
+		}
+		if tr.TTL != time.Second*time.Duration(ttl) {
+			t.Errorf("Expected TTL %d but got %v", ttl, tr.TTL)
+		}
+	default:
+		t.Errorf("Expected an SRV but got %v", tr)
 	}
 }
 
@@ -315,6 +359,89 @@ func TestRecord(t *testing.T) {
 	assertMx(t, r, "test", "test.com", 10, 300)
 
 	// SRV
+	nRecord = nfsnRecord{
+		Type: "SRV",
+		Name: "_jabber._tcp",
+		Data: "2 3 test.com.",
+		// The NFSN API puts the priority in the `aux` field, everything else in the `data` field
+		Aux: 1,
+		TTL: 300,
+	}
+
+	r, err = nRecord.Record()
+
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+
+	assertSrv(t, r, "jabber", "tcp", "@", "test.com.", 1, 2, 3, 300)
+
+	nRecord.Name = "_jabber._tcp.test.com"
+
+	r, err = nRecord.Record()
+
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+
+	assertSrv(t, r, "jabber", "tcp", "test.com", "test.com.", 1, 2, 3, 300)
+
+	nRecord.Name = ""
+
+	r, err = nRecord.Record()
+
+	if err == nil || !strings.Contains(err.Error(), "Name value") {
+		t.Errorf("Expected error from invalid SRV record %v", err)
+	}
+
+	nRecord.Name = "_jabber"
+
+	r, err = nRecord.Record()
+
+	if err == nil || !strings.Contains(err.Error(), "Name value") {
+		t.Errorf("Expected error from invalid SRV record %v", err)
+	}
+
+	nRecord.Name = "_jabber._tcp"
+	nRecord.Data = "test.com"
+
+	r, err = nRecord.Record()
+
+	if err == nil || !strings.Contains(err.Error(), "Data value") {
+		t.Errorf("Expected error from invalid SRV record %v", err)
+	}
+
+	nRecord.Data = "1 test.com"
+
+	r, err = nRecord.Record()
+
+	if err == nil || !strings.Contains(err.Error(), "Data value") {
+		t.Errorf("Expected error from invalid SRV record %v", err)
+	}
+
+	nRecord.Data = "1 2 3 test.com"
+
+	r, err = nRecord.Record()
+
+	if err == nil || !strings.Contains(err.Error(), "Data value") {
+		t.Errorf("Expected error from invalid SRV record %v", err)
+	}
+
+	nRecord.Data = "-1 2 test.com"
+
+	r, err = nRecord.Record()
+
+	if err == nil {
+		t.Errorf("Expected error from invalid SRV record")
+	}
+
+	nRecord.Data = "1 -2 test.com"
+
+	r, err = nRecord.Record()
+
+	if err == nil {
+		t.Errorf("Expected error from invalid SRV record")
+	}
 
 	// TXT
 	nRecord = nfsnRecord{

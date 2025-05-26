@@ -277,38 +277,6 @@ func toNfsnRecordParameters(record libdns.Record) (url.Values, error) {
 	}
 }
 
-// var dataBuilder strings.Builder
-
-// TODO FIXME
-
-/*
-		switch record.Type {
-		case "HTTPS":
-		case "MX":
-			dataBuilder.WriteString(fmt.Sprintf("%d ", record.Priority))
-		case "SRV":
-		case "URI":
-			dataBuilder.WriteString(fmt.Sprintf("%d %d ", record.Priority, record.Weight))
-		}
-
-		dataBuilder.WriteString(record.Value)
-
-		parameters := url.Values{}
-		parameters.Set("name", record.Name)
-		parameters.Set("type", record.Type)
-		parameters.Set("data", dataBuilder.String())
-
-		ttl := record.TTL
-
-	 	if ttl < minimumTTL {
-			ttl = minimumTTL
-		}
-
-		parameters.Set("ttl", fmt.Sprintf("%d", int(ttl.Seconds())))
-
-		return parameters
-*/
-
 // Constructs a value to pass into an X-NFSN-Authentication header.
 //
 // The header value has the format [LOGIN];[TIMESTAMP];[SALT];[HASH]
@@ -428,11 +396,11 @@ func (p *Provider) makeRequest(ctx context.Context, method string, url string, b
 
 	var bodyBytes []byte
 
-	if resp.Body != nil {
-		bodyBytes, _ = io.ReadAll(resp.Body)
-	}
-
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if resp.Body != nil {
+			bodyBytes, _ = io.ReadAll(resp.Body)
+		}
+
 		return nil, fmt.Errorf("API returned non-success status code %s with response body %s. Original error: %w", resp.Status, string(bodyBytes), err)
 	}
 

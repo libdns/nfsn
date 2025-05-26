@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
@@ -52,7 +53,7 @@ type nfsnRecord struct {
 }
 
 // The pieces necessary to make a request to create/update a record in NFSN. Differs slightly from
-// the fields in libdns.Record
+// the fields in libdns.Record - should re-test "aux" field not obvious it still exists...
 type nfsnRecordParameters struct {
 	Name string
 	Type string
@@ -60,71 +61,220 @@ type nfsnRecordParameters struct {
 	TTL  int
 }
 
-func (nRecord nfsnRecord) Record() (libdns.Record, error) {
-	record := libdns.Record{
-		Type:  nRecord.Type,
-		Name:  nRecord.Name,
-		Value: nRecord.Data,
-		TTL:   time.Second * time.Duration(nRecord.TTL),
-	}
-
+func (nRecord nfsnRecord) record() (libdns.Record, error) {
 	switch nRecord.Type {
-	case "HTTPS":
-	case "MX":
-		record.Priority = uint(nRecord.Aux)
-	case "SRV":
-	case "URI":
-		// Priority is in the 'aux' field from NFSN
-		record.Priority = uint(nRecord.Aux)
-
-		// Data is "weight port target", libdns expects weight in the record
-		parts := strings.SplitN(nRecord.Data, " ", 2)
-
-		if len(parts) != 3 {
-			return libdns.Record{}, fmt.Errorf("%s record %s has incorrect format", nRecord.Name, nRecord.Data)
-		}
-
-		weight, err := strconv.Atoi(parts[0])
+	case "A":
+		fallthrough
+	case "AAAA":
+		addr, err := netip.ParseAddr(nRecord.Data)
 
 		if err != nil {
-			return libdns.Record{}, err
+			return libdns.RR{}, err
 		}
 
-		record.Weight = uint(weight)
-		record.Value = parts[1]
-	}
+		return libdns.Address{
+			Name: nameForLibdns(nRecord.Name),
+			IP:   addr,
+			TTL:  time.Second * time.Duration(nRecord.TTL),
+		}, nil
+	case "CNAME":
+		return libdns.CNAME{
+			Name:   nameForLibdns(nRecord.Name),
+			Target: nRecord.Data,
+			TTL:    time.Second * time.Duration(nRecord.TTL),
+		}, nil
+	case "NS":
+		return libdns.NS{
+			Name:   nameForLibdns(nRecord.Name),
+			Target: nRecord.Data,
+			TTL:    time.Second * time.Duration(nRecord.TTL),
+		}, nil
+	case "PTR":
+		// libdns doesn't have a PTR type so return an RR directly
+		return libdns.RR{
+			Type: "PTR",
+			Name: nameForLibdns(nRecord.Name),
+			Data: nRecord.Data,
+			TTL:  time.Second * time.Duration(nRecord.TTL),
+		}, nil
+	case "MX":
+		return libdns.MX{
+			Name:       nameForLibdns(nRecord.Name),
+			Target:     nRecord.Data,
+			TTL:        time.Second * time.Duration(nRecord.TTL),
+			Preference: uint16(nRecord.Aux),
+		}, nil
+	case "TXT":
+		return libdns.TXT{
+			Name: nameForLibdns(nRecord.Name),
+			Text: nRecord.Data,
+			TTL:  time.Second * time.Duration(nRecord.TTL),
+		}, nil
+	case "SRV":
+		// Name is "_SERVICE._TRANSPORT.NAME" - NFSN allows .NAME to be omitted in which case the record
+		// is for the zone domain name. If .NAME is omitted, libdns expects the value "@". libdns also
+		// expects the service and transport values to omit the preceding '_' characters.
+		nameFields := strings.SplitN(nRecord.Name, ".", 3)
 
-	return record, nil
+		if len(nameFields) < 2 {
+			return libdns.RR{}, fmt.Errorf("Name value '%s' has too few fields, expected at least 2", nRecord.Name)
+		}
+
+		name := "@"
+
+		if len(nameFields) == 3 && nameFields[2] != "" {
+			name = nameFields[2]
+		}
+
+		// Data is "WEIGHT PORT TARGET", the priority is in the Aux field.
+		dataFields := strings.Fields(nRecord.Data)
+
+		if len(dataFields) != 3 {
+			return libdns.RR{}, fmt.Errorf("Data value '%s' has wrong number of fields, expected 3", nRecord.Data)
+		}
+
+		weight, err := strconv.ParseUint(dataFields[0], 10, 16)
+
+		if err != nil {
+			return libdns.RR{}, err
+		}
+
+		port, err := strconv.ParseUint(dataFields[1], 10, 16)
+
+		if err != nil {
+			return libdns.RR{}, err
+		}
+
+		return libdns.SRV{
+			Service:   strings.TrimPrefix(nameFields[0], "_"),
+			Transport: strings.TrimPrefix(nameFields[1], "_"),
+			Name:      name,
+			TTL:       time.Second * time.Duration(nRecord.TTL),
+			Priority:  uint16(nRecord.Aux),
+			Weight:    uint16(weight),
+			Port:      uint16(port),
+			Target:    dataFields[2],
+		}, nil
+	default:
+		return libdns.RR{}, fmt.Errorf("Unsupported record type %s", nRecord.Type)
+	}
 }
 
-func toNfsnRecordParameters(record libdns.Record) url.Values {
-	var dataBuilder strings.Builder
-
-	switch record.Type {
-	case "HTTPS":
-	case "MX":
-		dataBuilder.WriteString(fmt.Sprintf("%d ", record.Priority))
-	case "SRV":
-	case "URI":
-		dataBuilder.WriteString(fmt.Sprintf("%d %d ", record.Priority, record.Weight))
+func nameForLibdns(nfsName string) string {
+	if nfsName == "" {
+		return "@"
 	}
 
-	dataBuilder.WriteString(record.Value)
+	return nfsName
+}
 
-	parameters := url.Values{}
-	parameters.Set("name", record.Name)
-	parameters.Set("type", record.Type)
-	parameters.Set("data", dataBuilder.String())
+func nameForNfsn(libdnsName string) string {
+	if libdnsName == "@" {
+		return ""
+	}
 
-	ttl := record.TTL
+	return libdnsName
+}
 
- 	if ttl < minimumTTL {
+func ttlForNfsn(libdnsTtl time.Duration) string {
+	ttl := libdnsTtl
+
+	if ttl < minimumTTL {
 		ttl = minimumTTL
 	}
 
-	parameters.Set("ttl", fmt.Sprintf("%d", int(ttl.Seconds())))
+	return fmt.Sprintf("%d", int(ttl.Seconds()))
+}
 
-	return parameters
+func innerToNfsnRecordParameters(record libdns.Record) (url.Values, error) {
+	switch r := record.(type) {
+	case libdns.Address:
+		parameters := url.Values{}
+
+		if r.IP.Is4() {
+			parameters.Set("type", "A")
+		} else {
+			parameters.Set("type", "AAAA")
+		}
+
+		parameters.Set("name", nameForNfsn(r.Name))
+		parameters.Set("data", r.IP.String())
+		parameters.Set("ttl", ttlForNfsn(r.TTL))
+		return parameters, nil
+	case libdns.CNAME:
+		parameters := url.Values{}
+		parameters.Set("type", "CNAME")
+		parameters.Set("name", nameForNfsn(r.Name))
+		parameters.Set("data", r.Target)
+		parameters.Set("ttl", ttlForNfsn(r.TTL))
+		return parameters, nil
+	case libdns.MX:
+		parameters := url.Values{}
+		parameters.Set("type", "MX")
+		parameters.Set("name", nameForNfsn(r.Name))
+		parameters.Set("data", r.Target)
+		parameters.Set("aux", fmt.Sprintf("%d", r.Preference))
+		parameters.Set("ttl", ttlForNfsn(r.TTL))
+		return parameters, nil
+	case libdns.NS:
+		parameters := url.Values{}
+		parameters.Set("type", "NS")
+		parameters.Set("name", nameForNfsn(r.Name))
+		parameters.Set("data", r.Target)
+		parameters.Set("ttl", ttlForNfsn(r.TTL))
+		return parameters, nil
+	case libdns.SRV:
+		parameters := url.Values{}
+		parameters.Set("type", "SRV")
+
+		name := nameForNfsn(r.Name)
+
+		if name != "" {
+			// Prepend with '.' so that the name parameter becomes "_SERVICE._TRANSPORT.NAME"
+			name = fmt.Sprintf(".%s", name)
+		}
+
+		parameters.Set("name", fmt.Sprintf("_%s._%s%s", r.Service, r.Transport, name))
+
+		// Data is "WEIGHT PORT TARGET"
+		parameters.Set("data", fmt.Sprintf("%d %d %s", r.Weight, r.Port, r.Target))
+		parameters.Set("aux", fmt.Sprintf("%d", r.Priority))
+		parameters.Set("ttl", ttlForNfsn(r.TTL))
+		return parameters, nil
+	case libdns.TXT:
+		parameters := url.Values{}
+		parameters.Set("type", "TXT")
+		parameters.Set("name", nameForNfsn(r.Name))
+		parameters.Set("data", r.Text)
+		parameters.Set("ttl", ttlForNfsn(r.TTL))
+		return parameters, nil
+	default:
+		// libdns doesn't have a PTR type but NFSN supports it
+		if r.RR().Type == "PTR" {
+			parameters := url.Values{}
+			parameters.Set("type", "PTR")
+			parameters.Set("name", nameForNfsn(r.RR().Name))
+			parameters.Set("data", r.RR().Data)
+			parameters.Set("ttl", ttlForNfsn(r.RR().TTL))
+			return parameters, nil
+		}
+		return url.Values{}, fmt.Errorf("Unsupported record type %s", r.RR().Type)
+	}
+}
+
+func toNfsnRecordParameters(record libdns.Record) (url.Values, error) {
+	switch r := record.(type) {
+	case libdns.RR:
+		rr, err := r.Parse()
+
+		if err != nil {
+			return url.Values{}, err
+		}
+
+		return innerToNfsnRecordParameters(rr)
+	default:
+		return innerToNfsnRecordParameters(r)
+	}
 }
 
 // Constructs a value to pass into an X-NFSN-Authentication header.
@@ -246,39 +396,50 @@ func (p *Provider) makeRequest(ctx context.Context, method string, url string, b
 
 	var bodyBytes []byte
 
-	if resp.Body != nil {
-		bodyBytes, _ = io.ReadAll(resp.Body)
-	}
-
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if resp.Body != nil {
+			bodyBytes, _ = io.ReadAll(resp.Body)
+		}
+
 		return nil, fmt.Errorf("API returned non-success status code %s with response body %s. Original error: %w", resp.Status, string(bodyBytes), err)
 	}
 
 	return resp, err
 }
 
-// Execute the given `verb` for each record in `records`. Accumulate successfully process records
-// and return them at the end. If only some records are processed, returns those that were
-// successfull _and_ an error.
-func (p *Provider) processRecords(ctx context.Context, zone string, verb string, records []libdns.Record) ([]libdns.Record, error) {
-	uri := uriForZone(zone, verb)
+type recordOperation struct {
+	verb   string
+	record libdns.Record
+}
+
+// Execute operations in ops. Accumulate successfully processed records and return them at the
+// end. If only some records are processed, returns those that were successfull _and_ an error.
+func (p *Provider) processRecords(ctx context.Context, zone string, ops []recordOperation) ([]libdns.Record, error) {
 	var successfulRecords []libdns.Record
 
-	for _, record := range records {
-		params := toNfsnRecordParameters(record)
-		_, err := p.makeRequest(ctx, "POST", uri, strings.NewReader(params.Encode()))
+	for _, op := range ops {
+		uri := uriForZone(zone, op.verb)
+
+		// TODO consider doing all this up front so that invalid records are caught before mutation
+		params, err := toNfsnRecordParameters(op.record)
 
 		if err != nil {
 			return successfulRecords, err
 		}
 
-		successfulRecords = append(successfulRecords, record)
+		_, err = p.makeRequest(ctx, "POST", uri, strings.NewReader(params.Encode()))
+
+		if err != nil {
+			return successfulRecords, err
+		}
+
+		successfulRecords = append(successfulRecords, op.record)
 	}
 
 	return successfulRecords, nil
 }
 
-// GetRecords lists all the records in the zone.
+// See libdns.RecordGetter
 func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record, error) {
 	resp, err := p.makeRequest(ctx, "POST", uriForZone(zone, "listRRs"), nil)
 
@@ -302,7 +463,7 @@ func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record
 	records := make([]libdns.Record, 0, len(nRecords))
 
 	for _, nRecord := range nRecords {
-		record, err := nRecord.Record()
+		record, err := nRecord.record()
 
 		if err != nil {
 			return nil, err
@@ -314,23 +475,60 @@ func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record
 	return records, nil
 }
 
-// AppendRecords adds records to the zone. It returns the records that were added. In the case where
-// only some records succeed returns both the records that were added and an error.
+// See libdns.RecordAppender
 func (p *Provider) AppendRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	return p.processRecords(ctx, zone, "addRR", records)
+	ops := make([]recordOperation, 0, len(records))
+
+	for _, r := range records {
+		ops = append(ops, recordOperation{"addRR", r})
+	}
+
+	return p.processRecords(ctx, zone, ops)
 }
 
-// SetRecords sets the records in the zone, either by updating existing records or creating new
-// ones. It returns the updated records. In the case where only some records succeed returns both
-// the records that were replaced and an error.
+func computeSetRecordsOperations(records []libdns.Record) []recordOperation {
+	ops := make([]recordOperation, 0, len(records))
+	opsByNameType := make(map[string][]recordOperation)
+
+	for _, r := range records {
+		k := fmt.Sprintf("%s%s", r.RR().Name, r.RR().Type)
+		verb := "replaceRR"
+
+		if len(opsByNameType[k]) > 0 {
+			verb = "addRR"
+		}
+
+		opsByNameType[k] = append(opsByNameType[k], recordOperation{verb, r})
+	}
+
+	for k := range opsByNameType {
+		for _, op := range opsByNameType[k] {
+			ops = append(ops, op)
+		}
+	}
+
+	return ops
+}
+
+// See libdns.RecordSetter
+//
+// NFSN does not support atomic zone modification, so after computing the operations to perform each
+// one will be attempted serially. In the case where only some operations succeed, returns both the
+// records that were set (if any) and an error.
 func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	return p.processRecords(ctx, zone, "replaceRR", records)
+	ops := computeSetRecordsOperations(records)
+	return p.processRecords(ctx, zone, ops)
 }
 
-// DeleteRecords deletes the records from the zone. It returns the records that were deleted. In the
-// case where only some records succeed returns both the records that were deleted and an error.
+// See libdns.RecordDeleter
 func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	return p.processRecords(ctx, zone, "removeRR", records)
+	ops := make([]recordOperation, 0, len(records))
+
+	for _, r := range records {
+		ops = append(ops, recordOperation{"removeRR", r})
+	}
+
+	return p.processRecords(ctx, zone, ops)
 }
 
 // Interface guards

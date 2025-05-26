@@ -15,11 +15,11 @@ import (
 
 type operation string
 
-const(
-	OperationAddRecord = "AddRecord"
+const (
+	OperationAddRecord    = "AddRecord"
 	OperationDeleteRecord = "DeleteRecord"
-	OperationGetRecords = "GetRecords"
-	OperationSetRecord = "SetRecord"
+	OperationGetRecords   = "GetRecords"
+	OperationSetRecord    = "SetRecord"
 )
 
 func (o *operation) String() string {
@@ -79,7 +79,7 @@ func main() {
 	}
 
 	p := nfsn.Provider{
-		Login: *lArg,
+		Login:  *lArg,
 		APIKey: apiKey,
 	}
 
@@ -104,14 +104,14 @@ func main() {
 	case OperationDeleteRecord:
 		fallthrough
 	case OperationSetRecord:
-		record := libdns.Record{
+		record := libdns.RR{
 			Type: *tArg,
 			Name: *nArg,
-			Value: *dArg,
-			TTL: 3600,
+			Data: *dArg,
+			TTL:  3600,
 		}
 		fmt.Printf("Processing record to zone %s in account %s with values:\n", *zArg, p.Login)
-		fmt.Printf("  Type: %s\n  Name: %s\n Value: %s\n", record.Type, record.Name, record.Value)
+		fmt.Printf("  Type: %s\n  Name: %s\n Value: %s\n", record.Type, record.Name, record.Data)
 
 		var toProcess []libdns.Record
 		var err error
